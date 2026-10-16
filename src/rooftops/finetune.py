@@ -61,9 +61,10 @@ class HOTOSMNet(nn.Module):
 
     def forward(self, x):
         height, width = x.shape[-2:]
-        features = self.net.backbone.get_intermediate_layers(
-            x, n=(2, 5, 8, 11), return_class_token=False
-        )
+        with torch.no_grad():
+            features = self.net.backbone.get_intermediate_layers(
+                x, n=(2, 5, 8, 11), return_class_token=False
+            )
         pyramidal = self.net.pyramid(features, height, width)
         decoded = self.net.decoder(pyramidal)
         return F.interpolate(self.net.head(decoded), size=(height, width), mode="bilinear", align_corners=False)
@@ -95,10 +96,10 @@ def main():
     parser.add_argument("--footprints", help="directory of per-tile footprint targets")
     parser.add_argument("--out", default="dinov3s-buildings-finetuned.ckpt")
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--bs", type=int, default=8)
+    parser.add_argument("--bs", type=int, default=1, help="reduce if CUDA runs out of memory")
     parser.add_argument("--n_per_tile", type=int, default=12)
     parser.add_argument("--crop", type=int, default=256)
-    parser.add_argument("--input_size", type=int, default=512)
+    parser.add_argument("--input_size", type=int, default=256, help="decoder resolution; 256 is GPU-friendly")
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--val_every", type=int, default=5)

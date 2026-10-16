@@ -60,6 +60,21 @@ rooftops-finetune \
   --out dinov3s-buildings-finetuned.ckpt
 ```
 
+The memory-friendly defaults use one 256x256 crop per batch. For an 11.6 GiB
+GPU, keep those defaults; if memory is still insufficient, reduce the crop and
+decoder resolution together:
+
+```bash
+python -m rooftops \
+  --checkpoint model.ckpt \
+  --coco annot/instances_default.json \
+  --images Images \
+  --bs 1 \
+  --crop 224 \
+  --input_size 224 \
+  --out dinov3s-buildings-finetuned.ckpt
+```
+
 The footprint targets can be a directory containing one
 `<tile_stem>.{geojson,json,png,tif}` file per tile. If `--footprints` is
 omitted, the union of roof polygons in the COCO annotations is used for
