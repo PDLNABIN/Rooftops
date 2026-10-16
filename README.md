@@ -76,6 +76,17 @@ python -m rooftops \
   --out dinov3s-buildings-finetuned.ckpt
 ```
 
+Training displays a batch progress bar and writes metrics after every epoch.
+By default, artifacts are saved in
+`dinov3s-buildings-finetuned_training/`; override this with `--metrics_dir`.
+The directory contains:
+
+- `training_metrics.json` and `training_metrics.csv`
+- `loss.png`
+- `iou.png`
+- `f1.png`
+- `learning_rate.png`
+
 The footprint targets can be a directory containing one
 `<tile_stem>.{geojson,json,png,tif}` file per tile. If `--footprints` is
 omitted, the union of roof polygons in the COCO annotations is used for
