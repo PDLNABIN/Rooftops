@@ -81,6 +81,41 @@ python Roff.py charts \
 | `roof_net.py` | Standalone footprint/material training and inference pipeline |
 | `requirements.txt` | Python dependencies |
 
+## Two-stage training
+
+`roof_net.py` keeps the DINOv3 backbone frozen. The footprint (`fp`) decoder
+is trained independently from the material (`mat`) and building-level
+classification (`cls`) heads. To first fine-tune building detection only,
+train just the footprint UPerNet-style decoder:
+
+```bash
+python roof_net.py train \
+  --coco path/to/instances_default.json \
+  --images path/to/images \
+  --footprints path/to/footprint_targets \
+  --train_heads fp \
+  --out roofnet_footprints.pt
+```
+
+The footprint targets can be a directory containing one
+`<tile_stem>.{geojson,json,png,tif}` file per tile. If `--footprints` is
+omitted, the union of roof polygons in the COCO annotations is used for
+annotated tiles. Building-only training does not require material labels.
+Only `RoofNet.fp` is passed to the optimizer; DINOv3 remains frozen and in
+evaluation mode.
+
+Afterwards, initialize a second stage from that checkpoint and train the
+remaining heads as needed, for example:
+
+```bash
+python roof_net.py train \
+  --coco path/to/instances_default.json \
+  --images path/to/images \
+  --init roofnet_footprints.pt \
+  --train_heads mat,cls \
+  --out roofnet.pt
+```
+
 ## Notes
 
 The DINOv3 backbone may require accepting the model license and authenticating

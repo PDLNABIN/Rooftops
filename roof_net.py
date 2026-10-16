@@ -8,7 +8,9 @@ roofnet.py - ONE frozen DINOv3 ViT-S/16 backbone, several independent heads (one
         It is a dense per-token head whose logits are mean-pooled over each building, so it works on windows.
 
 Because the backbone is frozen, heads never interfere: train all at once, or add/retrain one later
-(`--init roofnet.pt --train_heads cls`) and the other heads stay byte-identical.
+(`--init roofnet.pt --train_heads cls`) and the other heads stay byte-identical. For a first-stage
+building detector, use `--train_heads fp`; this optimizes only the footprint UPerNet-style decoder
+and requires no roof-material labels.
 
 Footprint supervision (fp head) comes from, in order of preference:
   --footprints DIR : <tile_stem>.{geojson,png,tif} per tile (e.g. Google Open Buildings polygons,
@@ -787,6 +789,8 @@ def cmd_train(a):
     tr, va = split(load_tiles(a.coco, a.images, a.footprints), a.val_every)
     print(f"tiles: train={len(tr)} val={len(va)} | with roof labels: {sum(t['has_mat'] for t in tr)} "
           f"| with footprint targets: {sum(t['has_fp'] for t in tr)}")
+    if "fp" in heads and not any(t["has_fp"] for t in tr):
+        raise SystemExit("building-only training needs footprint targets: pass --footprints or provide roof polygons")
     mat_tiles = [t for t in tr if t["has_mat"]]
     if ("mat" in heads or "cls" in heads) and not mat_tiles:
         raise SystemExit("no tiles with roof-material labels in the training split")
@@ -806,6 +810,10 @@ def cmd_train(a):
     for h in HEADS:
         for p in getattr(model, h).parameters():
             p.requires_grad = h in heads
+    trainable = {name for name, p in model.named_parameters() if p.requires_grad}
+    assert trainable and all(not name.startswith("bb.") for name in trainable), \
+        "only decoder heads may be trainable; DINOv3 must remain frozen"
+    print("trainable heads:", ", ".join(heads), "| DINOv3: frozen")
     have_fp = "fp" in heads or bool(a.init)
 
     tl = DataLoader(CropDS(tr, a.crop, a.n_per_tile), a.bs, shuffle=True, num_workers=a.workers, drop_last=True)
@@ -937,7 +945,8 @@ def main():
     t.add_argument("--coco", required=True); t.add_argument("--images", required=True)
     t.add_argument("--footprints", help="folder of <tile_stem>.{geojson,png,tif} footprint targets for the fp head")
     t.add_argument("--backbone", default="facebook/dinov3-vits16-pretrain-lvd1689m")
-    t.add_argument("--train_heads", default="fp,mat,cls", help="comma list; other heads stay frozen")
+    t.add_argument("--train_heads", default="fp,mat,cls",
+                   help="comma list; use 'fp' for building-only UPerNet decoder fine-tuning")
     t.add_argument("--init", help="warm start from a previous roofnet.pt (add/retrain individual heads)")
     t.add_argument("--out", default="roofnet.pt")
     t.add_argument("--epochs", type=int, default=80); t.add_argument("--bs", type=int, default=16)
