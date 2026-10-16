@@ -1,14 +1,16 @@
 """Run building-footprint inference with a fine-tuned HOTOSM model."""
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image
+from scipy import ndimage
 
 from .config import load_section
 from .data import MEAN, STD, read_image
-from .model import load_pretrained
+from .model import load_classification_head, load_pretrained
 
 
 def parse_args():
@@ -32,7 +34,7 @@ def parse_args():
     return argparse.Namespace(**values)
 
 
-def infer(model, image_path, out_dir, input_size, threshold, device):
+def infer(model, classifier, class_names, image_path, out_dir, input_size, threshold, device):
     image = read_image(Path(image_path))
     original_height, original_width = image.shape[:2]
     tensor = torch.from_numpy(
@@ -43,6 +45,7 @@ def infer(model, image_path, out_dir, input_size, threshold, device):
     ).to(device)
     model.eval()
     with torch.no_grad():
+        features = model.backbone_features(tensor)
         probability = model(tensor)[:, 0].sigmoid()
         probability = torch.nn.functional.interpolate(
             probability[:, None], size=(original_height, original_width),
@@ -55,6 +58,25 @@ def infer(model, image_path, out_dir, input_size, threshold, device):
     mask = (probability >= threshold).astype(np.uint8) * 255
     overlay = image.astype(np.float32)
     overlay[mask > 0] = overlay[mask > 0] * 0.45 + np.array([255, 40, 40]) * 0.55
+    components, count = ndimage.label(mask > 0)
+    colors = np.array([
+        [230, 25, 75], [60, 180, 75], [255, 225, 25],
+        [0, 130, 200], [245, 130, 48], [145, 30, 180],
+    ])
+    classifications = []
+    for component_id in range(1, count + 1):
+        component = components == component_id
+        if component.sum() < 16:
+            continue
+        component_tensor = torch.from_numpy(component.astype(np.float32))[None].to(device)
+        component_tensor = torch.nn.functional.interpolate(
+            component_tensor[:, None], size=(input_size, input_size), mode="nearest"
+        )[:, 0]
+        class_id = int(classifier(features, component_tensor).argmax(1).item())
+        class_name = class_names.get(class_id, str(class_id))
+        color = colors[class_id % len(colors)]
+        overlay[component] = overlay[component] * 0.35 + color * 0.65
+        classifications.append({"component": component_id, "class": class_name})
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -65,7 +87,9 @@ def infer(model, image_path, out_dir, input_size, threshold, device):
     axes[1].imshow(mask, cmap="gray", vmin=0, vmax=255)
     axes[1].set_title(f"Building mask (threshold={threshold:g})")
     axes[2].imshow(np.clip(overlay, 0, 255).astype(np.uint8))
-    axes[2].set_title("Building overlay")
+    label_text = ", ".join(item["class"] for item in classifications[:5])
+    suffix = "..." if len(classifications) > 5 else ""
+    axes[2].set_title(f"Roof classes: {label_text}{suffix}" if label_text else "Building overlay")
     for axis in axes:
         axis.axis("off")
     figure.suptitle(stem)
@@ -73,6 +97,9 @@ def infer(model, image_path, out_dir, input_size, threshold, device):
     figure.savefig(output / f"{stem}_inference.png", dpi=160, bbox_inches="tight")
     plt.close(figure)
     np.save(output / f"{stem}_building_probability.npy", probability)
+    (output / f"{stem}_roof_classes.json").write_text(
+        json.dumps(classifications, indent=2)
+    )
     return output
 
 
@@ -88,8 +115,15 @@ def main():
         raise SystemExit(f"no supported images found in {image_path}")
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_pretrained(args.checkpoint, device)
+    checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+    raw_names = checkpoint.get("class_names")
+    if raw_names is None:
+        raise SystemExit("checkpoint does not contain rooftop class names; retrain with the classifier head")
+    class_names = {int(key): value for key, value in raw_names.items()}
+    classifier = load_classification_head(args.checkpoint, device, len(class_names))
     for path in image_paths:
-        output = infer(model, path, args.out_dir, args.input_size, args.threshold, device)
+        output = infer(model, classifier, class_names, path, args.out_dir,
+                       args.input_size, args.threshold, device)
         print(f"saved inference results for {path.name}: {output}", flush=True)
 
 

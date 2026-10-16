@@ -19,6 +19,9 @@ training:
   val_every: 5
   seed: 0
   metrics_dir:
+  classifier_epochs: 20
+  classifier_lr: 0.001
+  classifier_weight_decay: 0.01
 
 inference:
   checkpoint: dinov3s-buildings-finetuned.ckpt

@@ -54,14 +54,46 @@ class HOTOSMNet(nn.Module):
                 module.eval()
 
     def forward(self, x):
+        decoded = self.decoder_features(x)
+        return F.interpolate(self.net.head(decoded), size=x.shape[-2:], mode="bilinear", align_corners=False)
+
+    def backbone_features(self, x):
+        with torch.no_grad():
+            features = self.net.backbone.get_intermediate_layers(
+                x, n=(2, 5, 8, 11), return_class_token=False
+            )
+        tokens = features[-1]
+        height, width = x.shape[-2:]
+        grid_h, grid_w = height // 16, width // 16
+        return tokens[:, -grid_h * grid_w:].transpose(1, 2).reshape(x.shape[0], -1, grid_h, grid_w)
+
+    def decoder_features(self, x):
         height, width = x.shape[-2:]
         with torch.no_grad():
             features = self.net.backbone.get_intermediate_layers(
                 x, n=(2, 5, 8, 11), return_class_token=False
             )
         pyramidal = self.net.pyramid(features, height, width)
-        decoded = self.net.decoder(pyramidal)
-        return F.interpolate(self.net.head(decoded), size=(height, width), mode="bilinear", align_corners=False)
+        return self.net.decoder(pyramidal)
+
+
+class MaskedDINOClassifier(nn.Module):
+    def __init__(self, classes):
+        super().__init__()
+        self.head = nn.Linear(384, classes)
+
+    def forward(self, feature_map, building_mask):
+        mask = F.interpolate(
+            building_mask[:, None].float(), size=feature_map.shape[-2:], mode="nearest"
+        )
+        pooled = (feature_map * mask).sum(dim=(2, 3)) / mask.sum(dim=(2, 3)).clamp_min(1)
+        return self.head(pooled)
+
+
+def freeze_all(model):
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+    model.eval()
 
 
 def load_pretrained(path, device):
@@ -79,3 +111,13 @@ def load_pretrained(path, device):
             parameter.requires_grad = True
     model.net.backbone.eval()
     return model.to(device)
+
+
+def load_classification_head(path, device, class_count):
+    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    state = checkpoint.get("classification_head")
+    if state is None:
+        raise ValueError(f"{path} does not contain a rooftop classification head")
+    classifier = MaskedDINOClassifier(class_count)
+    classifier.load_state_dict(state, strict=True)
+    return classifier.to(device)

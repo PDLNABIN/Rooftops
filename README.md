@@ -33,6 +33,7 @@ running the commands below.
 | `src/rooftops/trainer.py` | Training and validation loop |
 | `src/rooftops/metrics.py` | Metrics, CSV/JSON persistence, and plots |
 | `src/rooftops/infer.py` | Building-mask inference and visualization |
+| `src/rooftops/config.py` | YAML configuration loading |
 | `config.yaml` | YAML controls for training and inference |
 | `pyproject.toml` | Package metadata and console entry point |
 | `requirements.txt` | Python dependencies |
@@ -105,6 +106,13 @@ annotated tiles. Building-only fine-tuning does not require material labels.
 The checkpoint is loaded strictly, so a mismatched architecture fails loudly
 instead of silently starting a new decoder.
 
+After the building decoder is fine-tuned, the pipeline freezes the complete
+DINOv3/UPerNet model and trains a separate rooftop-material classifier. The
+classifier uses masked average pooling of frozen DINOv3 features inside each
+COCO rooftop polygon. The included COCO categories are `CGI`, `Concrete`,
+`Mud`, `Tarpaulin`, and `Tile`. Its settings are controlled by
+`classifier_epochs`, `classifier_lr`, and `classifier_weight_decay`.
+
 All training settings can be managed in [`config.yaml`](./config.yaml):
 
 ```bash
@@ -132,8 +140,9 @@ python -m rooftops.infer \
 ```
 
 The inference output directory contains one labeled three-panel PNG for each
-input image: the original image, binary building mask, and red overlay. It
-also saves a NumPy probability map for each image. To process every supported
+input image: the original image, binary building mask, and class-colored
+building overlay. It also saves a NumPy probability map and a JSON list of
+predicted rooftop classes for each connected building region. To process every supported
 image in a test directory, pass the directory instead:
 
 ```bash

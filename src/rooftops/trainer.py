@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 from .data import CropDataset, footprint_loss
 from .metrics import save, summarize, update_counts
+from .model import MaskedDINOClassifier, freeze_all
 
 
 def train(model, train_tiles, validation_tiles, args, device):
@@ -52,7 +53,7 @@ def train(model, train_tiles, validation_tiles, args, device):
         train_loss = 0.0
         train_counts = {key: 0 for key in ("tp", "tn", "fp", "fn")}
         progress = tqdm(loader, desc=f"Epoch {epoch + 1}/{args.epochs}", unit="batch")
-        for x, target in progress:
+        for x, target, _ in progress:
             x, target = x.to(device), target.to(device)
             x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
             with torch.autocast(device, enabled=device == "cuda"):
@@ -72,7 +73,7 @@ def train(model, train_tiles, validation_tiles, args, device):
         if validation_loader:
             model.eval()
             with torch.no_grad():
-                for x, target in validation_loader:
+                for x, target, _ in validation_loader:
                     x, target = x.to(device), target.to(device)
                     x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
                     logits = model(x)
@@ -101,3 +102,69 @@ def train(model, train_tiles, validation_tiles, args, device):
     if best_state is not None:
         model.load_state_dict(best_state)
     return history
+
+
+def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device, class_count):
+    freeze_all(model)
+    classifier = MaskedDINOClassifier(class_count).to(device)
+    optimizer = torch.optim.AdamW(classifier.parameters(), lr=args.classifier_lr,
+                                  weight_decay=args.classifier_weight_decay)
+    train_loader = DataLoader(
+        CropDataset(train_tiles, args.crop, args.n_per_tile),
+        args.bs, shuffle=True, num_workers=args.workers, drop_last=True,
+    )
+    validation_loader = (
+        DataLoader(CropDataset(validation_tiles, args.crop, args.n_per_tile, augment=False),
+                   args.bs, shuffle=False, num_workers=args.workers)
+        if validation_tiles else None
+    )
+    history = []
+    metrics_dir = Path(args.metrics_dir) if args.metrics_dir else Path(args.out).with_suffix("").parent / (
+        f"{Path(args.out).stem}_training"
+    )
+    for epoch in range(args.classifier_epochs):
+        classifier.train()
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
+        progress = tqdm(train_loader, desc=f"Roof classifier {epoch + 1}/{args.classifier_epochs}", unit="batch")
+        for x, target, class_target in progress:
+            x, target, class_target = x.to(device), target.to(device), class_target.to(device)
+            x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
+            with torch.no_grad():
+                features = model.backbone_features(x)
+            logits = classifier(features, target)
+            loss = F.cross_entropy(logits, class_target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train_loss += float(loss.detach())
+            train_correct += int((logits.argmax(1) == class_target).sum())
+            train_total += class_target.numel()
+            progress.set_postfix(loss=f"{loss.item():.4f}",
+                                 accuracy=f"{train_correct / max(train_total, 1):.3f}")
+
+        validation_loss = 0.0
+        validation_correct = 0
+        validation_total = 0
+        if validation_loader:
+            classifier.eval()
+            with torch.no_grad():
+                for x, target, class_target in validation_loader:
+                    x, target, class_target = x.to(device), target.to(device), class_target.to(device)
+                    x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
+                    logits = classifier(model.backbone_features(x), target)
+                    validation_loss += float(F.cross_entropy(logits, class_target))
+                    validation_correct += int((logits.argmax(1) == class_target).sum())
+                    validation_total += class_target.numel()
+        history.append({
+            "epoch": epoch + 1,
+            "train_loss": train_loss / max(len(train_loader), 1),
+            "train_accuracy": train_correct / max(train_total, 1),
+            "val_loss": validation_loss / max(len(validation_loader) if validation_loader else 1, 1),
+            "val_accuracy": validation_correct / max(validation_total, 1),
+        })
+        print(f"roof classifier epoch {epoch + 1:3d} train_loss={history[-1]['train_loss']:.4f} "
+              f"val_loss={history[-1]['val_loss']:.4f} val_accuracy={history[-1]['val_accuracy']:.4f}",
+              flush=True)
+    return classifier, history

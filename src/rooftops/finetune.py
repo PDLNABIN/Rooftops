@@ -7,7 +7,7 @@ import torch
 from .config import load_section
 from .data import load_tiles, split
 from .model import load_pretrained
-from .trainer import train
+from .trainer import train, train_rooftop_classifier
 
 
 def parse_args():
@@ -37,6 +37,9 @@ def parse_args():
     parser.add_argument("--val_every", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--metrics_dir")
+    parser.add_argument("--classifier_epochs", type=int)
+    parser.add_argument("--classifier_lr", type=float)
+    parser.add_argument("--classifier_weight_decay", type=float)
     parsed = vars(parser.parse_args())
     config = load_section(parsed["config"] or config_args.config, "training")
     defaults = {
@@ -44,6 +47,8 @@ def parse_args():
         "n_per_tile": 12, "crop": 256, "input_size": 256, "lr": 1e-4,
         "lr_factor": 0.5, "lr_patience": 3, "min_lr": 1e-6, "workers": 0,
         "val_every": 5, "seed": 0,
+        "classifier_epochs": 20, "classifier_lr": 1e-3,
+        "classifier_weight_decay": 1e-2,
     }
     values = {**defaults, **config}
     values.update({key: value for key, value in parsed.items() if value is not None})
@@ -63,8 +68,17 @@ def main():
 
     model = load_pretrained(args.checkpoint, device)
     train(model, train_tiles, validation_tiles, args, device)
+    class_names = train_tiles[0].get("class_names", {})
+    if not class_names:
+        raise SystemExit("COCO categories are required to train the rooftop classifier")
+    classifier, classifier_history = train_rooftop_classifier(
+        model, train_tiles, validation_tiles, args, device, len(class_names)
+    )
     torch.save(
         {"state_dict": model.state_dict(),
+         "classification_head": classifier.state_dict(),
+         "classification_history": classifier_history,
+         "class_names": class_names,
          "hparams": {"seg_out_indices": (2, 5, 8, 11), "decoder_channels": 512}},
         args.out,
     )

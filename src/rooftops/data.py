@@ -78,6 +78,14 @@ def load_external_footprint(path, shape, threshold=0):
 def load_tiles(coco_path, image_dir, footprint_dir=None):
     with Path(coco_path).open() as source:
         coco = json.load(source)
+    category_ids = {
+        category["id"]: index + 1
+        for index, category in enumerate(sorted(coco.get("categories", []), key=lambda item: item["id"]))
+    }
+    category_names = {
+        index: category["name"]
+        for index, category in enumerate(sorted(coco.get("categories", []), key=lambda item: item["id"]))
+    }
     annotations = {}
     for annotation in coco["annotations"]:
         annotations.setdefault(annotation["image_id"], []).append(annotation)
@@ -86,12 +94,18 @@ def load_tiles(coco_path, image_dir, footprint_dir=None):
     for image in sorted(coco["images"], key=lambda item: item["file_name"]):
         width, height = image["width"], image["height"]
         roof_mask = Image.new("L", (width, height), 0)
+        class_mask = np.zeros((height, width), dtype=np.uint8)
+        class_mask_image = Image.fromarray(class_mask)
         draw = ImageDraw.Draw(roof_mask)
+        class_draw = ImageDraw.Draw(class_mask_image)
         for annotation in annotations.get(image["id"], []):
             if not isinstance(annotation["segmentation"], list):
                 raise ValueError("RLE segmentation is not supported; export polygon annotations")
             for polygon in annotation["segmentation"]:
-                draw.polygon(list(zip(polygon[0::2], polygon[1::2])), fill=1)
+                points = list(zip(polygon[0::2], polygon[1::2]))
+                draw.polygon(points, fill=1)
+                class_draw.polygon(points, fill=category_ids.get(annotation["category_id"], 0))
+        class_mask = np.array(class_mask_image, dtype=np.uint8)
         roof_mask = np.array(roof_mask, dtype=np.uint8)
         image_path = Path(image_dir) / Path(image["file_name"]).name
         rgb = read_image(image_path)
@@ -101,7 +115,12 @@ def load_tiles(coco_path, image_dir, footprint_dir=None):
         external = footprint_file(footprint_dir, Path(image["file_name"]).stem) if footprint_dir else None
         target = load_external_footprint(external, (height, width)) if external else roof_mask
         if external or roof_mask.any():
-            tiles.append({"name": image["file_name"], "rgb": rgb, "target": np.maximum(target, roof_mask)})
+            tiles.append({
+                "name": image["file_name"], "rgb": rgb,
+                "target": np.maximum(target, roof_mask),
+                "class_mask": class_mask,
+                "class_names": category_names,
+            })
     return tiles
 
 
@@ -158,7 +177,25 @@ class CropDataset(Dataset):
             image = np.clip(image * random.uniform(0.8, 1.2) + random.uniform(-0.08, 0.08), 0, 1)
         image = (image - MEAN) / STD
         tensor = lambda value, dtype: torch.from_numpy(np.ascontiguousarray(value).astype(dtype))
-        return tensor(image.transpose(2, 0, 1), np.float32), tensor(target, np.int64)
+        class_target = self.tile_class_target(tile, py, px)
+        return (
+            tensor(image.transpose(2, 0, 1), np.float32),
+            tensor(target, np.int64),
+            torch.tensor(class_target, dtype=torch.long),
+        )
+
+    @staticmethod
+    def tile_class_target(tile, y, x):
+        class_mask = tile["class_mask"]
+        value = int(class_mask[y, x])
+        if value:
+            return value - 1
+        nearby = class_mask[
+            max(0, y - 3):y + 4,
+            max(0, x - 3):x + 4,
+        ]
+        values, counts = np.unique(nearby[nearby > 0], return_counts=True)
+        return int(values[np.argmax(counts)] - 1) if len(values) else 0
 
 
 def footprint_loss(logits, target):
