@@ -56,8 +56,10 @@ def save(history, directory):
         fig.savefig(directory / f"{filename}.png", dpi=160, bbox_inches="tight")
         plt.close(fig)
     fig, axis = plt.subplots(figsize=(9, 5))
-    axis.plot(epochs, [row["learning_rate"] for row in history], marker="o")
+    axis.plot(epochs, [row["learning_rate"] for row in history],
+              marker="o", label="segmentation learning rate")
     axis.set(xlabel="Epoch", ylabel="Learning rate", title="Learning rate")
     axis.grid(alpha=0.25)
+    axis.legend(loc="best")
     fig.savefig(directory / "learning_rate.png", dpi=160, bbox_inches="tight")
     plt.close(fig)

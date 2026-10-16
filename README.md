@@ -133,6 +133,9 @@ The directory contains:
 - `f1.png`
 - `learning_rate.png`
 
+All training plots include explicit legends identifying the training,
+validation, or learning-rate series.
+
 The footprint targets can be a directory containing one
 `<tile_stem>.{geojson,json,png,tif}` file per tile. If `--footprints` is
 omitted, the union of roof polygons in the COCO annotations is used for
