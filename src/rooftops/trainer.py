@@ -1,6 +1,5 @@
 """Training loop for the HOTOSM building decoder."""
 import time
-from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -93,7 +92,10 @@ def train(model, train_tiles, validation_tiles, args, device):
             scheduler.step(row["val_loss"])
             if row["val_loss"] < best_validation_loss:
                 best_validation_loss = row["val_loss"]
-                best_state = deepcopy(model.state_dict())
+                best_state = {
+                    name: parameter.detach().cpu().clone()
+                    for name, parameter in model.state_dict().items()
+                }
         else:
             scheduler.step(row["train_loss"])
         print(f"epoch {row['epoch']:3d} train_loss={row['train_loss']:.4f} "

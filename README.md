@@ -481,6 +481,10 @@ The classifier and inference paths use `torch.inference_mode()` and CUDA
 automatic mixed precision. The training command also releases the CUDA cache
 between the segmentation and classifier stages.
 
+The best segmentation weights are copied to CPU memory when a validation
+improvement is found, so checkpoint selection does not duplicate the model on
+the GPU at the end of an epoch.
+
 ## Troubleshooting
 
 ### `ModuleNotFoundError: No module named 'rooftops'`
