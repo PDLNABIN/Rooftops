@@ -1,0 +1,28 @@
+# Paths and settings for training the HOTOSM building-footprint decoder.
+# Command-line arguments override values in this file.
+training:
+  checkpoint: model.ckpt
+  coco: annot/instances_default.json
+  images: Images
+  footprints:
+  out: dinov3s-buildings-finetuned.ckpt
+  epochs: 50
+  bs: 1
+  n_per_tile: 12
+  crop: 256
+  input_size: 256
+  lr: 0.0001
+  lr_factor: 0.5
+  lr_patience: 3
+  min_lr: 0.000001
+  workers: 0
+  val_every: 5
+  seed: 0
+  metrics_dir:
+
+inference:
+  checkpoint: dinov3s-buildings-finetuned.ckpt
+  image: test_images
+  out_dir: inference_all
+  input_size: 256
+  threshold: 0.5

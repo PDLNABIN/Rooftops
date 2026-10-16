@@ -4,35 +4,53 @@ from pathlib import Path
 
 import torch
 
+from .config import load_section
 from .data import load_tiles, split
 from .model import load_pretrained
 from .trainer import train
 
 
 def parse_args():
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config")
+    config_args, _ = config_parser.parse_known_args()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True, help="hotosm/dinov3s-buildings model.ckpt")
-    parser.add_argument("--coco", required=True)
-    parser.add_argument("--images", required=True)
-    parser.add_argument("--footprints", help="directory of per-tile footprint targets")
-    parser.add_argument("--out", default="dinov3s-buildings-finetuned.ckpt")
-    parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--bs", type=int, default=1, help="reduce if CUDA runs out of memory")
-    parser.add_argument("--n_per_tile", type=int, default=12)
-    parser.add_argument("--crop", type=int, default=256)
-    parser.add_argument("--input_size", type=int, default=256, help="decoder resolution; 256 is GPU-friendly")
-    parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--lr_factor", type=float, default=0.5,
+    parser.add_argument("--config", help="YAML configuration file")
+    parser.add_argument("--checkpoint", help="hotosm/dinov3s-buildings model.ckpt")
+    parser.add_argument("--coco")
+    parser.add_argument("--images")
+    parser.add_argument("--footprints")
+    parser.add_argument("--out")
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--bs", type=int, help="reduce if CUDA runs out of memory")
+    parser.add_argument("--n_per_tile", type=int)
+    parser.add_argument("--crop", type=int)
+    parser.add_argument("--input_size", type=int, help="decoder resolution; 256 is GPU-friendly")
+    parser.add_argument("--lr", type=float)
+    parser.add_argument("--lr_factor", type=float,
                         help="multiply the learning rate after validation stalls")
-    parser.add_argument("--lr_patience", type=int, default=3,
+    parser.add_argument("--lr_patience", type=int,
                         help="epochs without validation improvement before reducing learning rate")
-    parser.add_argument("--min_lr", type=float, default=1e-6,
+    parser.add_argument("--min_lr", type=float,
                         help="lower learning-rate bound")
-    parser.add_argument("--workers", type=int, default=0)
-    parser.add_argument("--val_every", type=int, default=5)
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--metrics_dir", help="directory for JSON, CSV, and PNG metrics")
-    return parser.parse_args()
+    parser.add_argument("--workers", type=int)
+    parser.add_argument("--val_every", type=int)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--metrics_dir")
+    parsed = vars(parser.parse_args())
+    config = load_section(parsed["config"] or config_args.config, "training")
+    defaults = {
+        "out": "dinov3s-buildings-finetuned.ckpt", "epochs": 50, "bs": 1,
+        "n_per_tile": 12, "crop": 256, "input_size": 256, "lr": 1e-4,
+        "lr_factor": 0.5, "lr_patience": 3, "min_lr": 1e-6, "workers": 0,
+        "val_every": 5, "seed": 0,
+    }
+    values = {**defaults, **config}
+    values.update({key: value for key, value in parsed.items() if value is not None})
+    for name in ("checkpoint", "coco", "images"):
+        if not values.get(name):
+            parser.error(f"--{name} is required either on the command line or in the YAML file")
+    return argparse.Namespace(**values)
 
 
 def main():

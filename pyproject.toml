@@ -18,6 +18,7 @@ dependencies = [
     "matplotlib>=3.7",
     "terratorch>=1.2",
     "torch>=2.0",
+    "PyYAML>=6.0",
 ]
 
 [project.scripts]

@@ -33,6 +33,7 @@ running the commands below.
 | `src/rooftops/trainer.py` | Training and validation loop |
 | `src/rooftops/metrics.py` | Metrics, CSV/JSON persistence, and plots |
 | `src/rooftops/infer.py` | Building-mask inference and visualization |
+| `config.yaml` | YAML controls for training and inference |
 | `pyproject.toml` | Package metadata and console entry point |
 | `requirements.txt` | Python dependencies |
 
@@ -104,6 +105,21 @@ annotated tiles. Building-only fine-tuning does not require material labels.
 The checkpoint is loaded strictly, so a mismatched architecture fails loudly
 instead of silently starting a new decoder.
 
+All training settings can be managed in [`config.yaml`](./config.yaml):
+
+```bash
+python -m rooftops --config config.yaml
+```
+
+This includes the checkpoint and dataset paths, batch size, crop and model
+input sizes, epochs, optimizer settings, validation interval, workers, and
+adaptive learning-rate settings. Any command-line option overrides the YAML
+value, for example:
+
+```bash
+python -m rooftops --config config.yaml --bs 1 --epochs 100 --input_size 224
+```
+
 ## Inference
 
 Run inference on a test image after fine-tuning:
@@ -128,6 +144,15 @@ python -m rooftops.infer \
 ```
 
 Use `--threshold` to change the probability cutoff.
+
+Inference can use the same YAML file:
+
+```bash
+python -m rooftops.infer --config config.yaml
+```
+
+The `inference` section controls the checkpoint, test image directory, output
+directory, model input size, and mask threshold.
 
 ## Notes
 

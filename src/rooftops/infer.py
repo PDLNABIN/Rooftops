@@ -6,18 +6,30 @@ import numpy as np
 import torch
 from PIL import Image
 
+from .config import load_section
 from .data import MEAN, STD, read_image
 from .model import load_pretrained
 
 
 def parse_args():
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config")
+    config_args, _ = config_parser.parse_known_args()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True)
-    parser.add_argument("--image", required=True, help="input image or directory, including GeoTIFF")
-    parser.add_argument("--out_dir", default="inference")
-    parser.add_argument("--input_size", type=int, default=256)
-    parser.add_argument("--threshold", type=float, default=0.5)
-    return parser.parse_args()
+    parser.add_argument("--config", help="YAML configuration file")
+    parser.add_argument("--checkpoint")
+    parser.add_argument("--image", help="input image or directory, including GeoTIFF")
+    parser.add_argument("--out_dir")
+    parser.add_argument("--input_size", type=int)
+    parser.add_argument("--threshold", type=float)
+    parsed = vars(parser.parse_args())
+    config = load_section(parsed["config"] or config_args.config, "inference")
+    values = {"out_dir": "inference", "input_size": 256, "threshold": 0.5, **config}
+    values.update({key: value for key, value in parsed.items() if value is not None})
+    for name in ("checkpoint", "image"):
+        if not values.get(name):
+            parser.error(f"--{name} is required either on the command line or in the YAML file")
+    return argparse.Namespace(**values)
 
 
 def infer(model, image_path, out_dir, input_size, threshold, device):
