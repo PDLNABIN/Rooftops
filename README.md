@@ -83,29 +83,30 @@ python Roff.py charts \
 
 ## Two-stage training
 
-`roof_net.py` keeps the DINOv3 backbone frozen. The footprint (`fp`) decoder
-is trained independently from the material (`mat`) and building-level
-classification (`cls`) heads. To first fine-tune building detection only,
-train just the footprint UPerNet-style decoder:
+For building detection, fine-tune the pretrained UPerNet from
+[`hotosm/dinov3s-buildings`](https://huggingface.co/hotosm/dinov3s-buildings).
+Download its `model.ckpt` file separately; it is intentionally not included in
+this repository. TerraTorch reconstructs the checkpoint's UPerNet decoder and
+learned feature pyramid, while every DINOv3 parameter remains frozen:
 
 ```bash
-python roof_net.py train \
+python hotosm_finetune.py \
+  --checkpoint path/to/model.ckpt \
   --coco path/to/instances_default.json \
   --images path/to/images \
   --footprints path/to/footprint_targets \
-  --train_heads fp \
-  --out roofnet_footprints.pt
+  --out dinov3s-buildings-finetuned.ckpt
 ```
 
 The footprint targets can be a directory containing one
 `<tile_stem>.{geojson,json,png,tif}` file per tile. If `--footprints` is
 omitted, the union of roof polygons in the COCO annotations is used for
-annotated tiles. Building-only training does not require material labels.
-Only `RoofNet.fp` is passed to the optimizer; DINOv3 remains frozen and in
-evaluation mode.
+annotated tiles. Building-only fine-tuning does not require material labels.
+The checkpoint is loaded strictly, so a mismatched architecture fails loudly
+instead of silently starting a new decoder.
 
-Afterwards, initialize a second stage from that checkpoint and train the
-remaining heads as needed, for example:
+The existing `roof_net.py` command remains available for the separate
+roof-material experiment. It does not load the HOTOSM UPerNet checkpoint.
 
 ```bash
 python roof_net.py train \
