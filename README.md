@@ -113,6 +113,9 @@ provided building footprint during training, while class samples are selected
 from labeled COCO rooftop polygons. The included COCO categories are `CGI`,
 `Concrete`, `Mud`, `Tarpaulin`, and `Tile`. Its settings are controlled by
 `classifier_epochs`, `classifier_lr`, and `classifier_weight_decay`.
+Only one stage is trainable at a time: the building segmentation stage runs
+first, then its complete model is frozen before the rooftop classifier stage
+starts. The stages are not jointly optimized.
 
 All training settings can be managed in [`config.yaml`](./config.yaml):
 

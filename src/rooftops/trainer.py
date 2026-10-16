@@ -106,7 +106,11 @@ def train(model, train_tiles, validation_tiles, args, device):
 
 def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device, class_count):
     freeze_all(model)
+    if any(parameter.requires_grad for parameter in model.parameters()):
+        raise RuntimeError("the complete DINOv3/UPerNet model must be frozen before classifier training")
     classifier = MaskedDINOClassifier(class_count).to(device)
+    if not all(parameter.requires_grad for parameter in classifier.parameters()):
+        raise RuntimeError("the rooftop classifier head must be trainable")
     optimizer = torch.optim.AdamW(classifier.parameters(), lr=args.classifier_lr,
                                   weight_decay=args.classifier_weight_decay)
     classifier_train_tiles = [tile for tile in train_tiles if tile["class_mask"].any()]
