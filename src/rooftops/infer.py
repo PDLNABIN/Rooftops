@@ -80,6 +80,7 @@ def infer(model, classifier, class_names, image_path, out_dir, input_size, thres
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
 
     figure, axes = plt.subplots(1, 3, figsize=(18, 6))
     axes[0].imshow(image)
@@ -90,10 +91,19 @@ def infer(model, classifier, class_names, image_path, out_dir, input_size, thres
     label_text = ", ".join(item["class"] for item in classifications[:5])
     suffix = "..." if len(classifications) > 5 else ""
     axes[2].set_title(f"Roof classes: {label_text}{suffix}" if label_text else "Building overlay")
+    legend_handles = [
+        Patch(facecolor="white", edgecolor="black", label="Building mask"),
+    ]
+    for class_id, class_name in sorted(class_names.items()):
+        legend_handles.append(
+            Patch(facecolor=colors[class_id % len(colors)] / 255, label=class_name)
+        )
+    figure.legend(handles=legend_handles, loc="lower center", ncol=min(len(legend_handles), 4),
+                 frameon=True, bbox_to_anchor=(0.5, -0.04))
     for axis in axes:
         axis.axis("off")
     figure.suptitle(stem)
-    figure.tight_layout()
+    figure.tight_layout(rect=(0, 0.08, 1, 0.95))
     figure.savefig(output / f"{stem}_inference.png", dpi=160, bbox_inches="tight")
     plt.close(figure)
     np.save(output / f"{stem}_building_probability.npy", probability)
