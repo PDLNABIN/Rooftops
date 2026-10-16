@@ -105,7 +105,7 @@ def main():
     torch.manual_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     train_tiles, _ = split(load_tiles(args.coco, args.images, args.footprints), args.val_every)
-    if not train_tiles or not any(tile["has_fp"] for tile in train_tiles):
+    if not train_tiles or not any(tile["target"].any() for tile in train_tiles):
         raise SystemExit("no footprint targets found; pass --footprints or provide roof polygons in COCO")
 
     model = load_pretrained(args.checkpoint, device)
