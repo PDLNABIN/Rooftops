@@ -109,8 +109,9 @@ instead of silently starting a new decoder.
 After the building decoder is fine-tuned, the pipeline freezes the complete
 DINOv3/UPerNet model and trains a separate rooftop-material classifier. The
 classifier uses masked average pooling of frozen DINOv3 features inside each
-COCO rooftop polygon. The included COCO categories are `CGI`, `Concrete`,
-`Mud`, `Tarpaulin`, and `Tile`. Its settings are controlled by
+provided building footprint during training, while class samples are selected
+from labeled COCO rooftop polygons. The included COCO categories are `CGI`,
+`Concrete`, `Mud`, `Tarpaulin`, and `Tile`. Its settings are controlled by
 `classifier_epochs`, `classifier_lr`, and `classifier_weight_decay`.
 
 All training settings can be managed in [`config.yaml`](./config.yaml):

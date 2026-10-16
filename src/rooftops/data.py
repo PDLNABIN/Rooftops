@@ -134,12 +134,15 @@ def split(tiles, validation_period):
 
 
 class CropDataset(Dataset):
-    def __init__(self, tiles, crop_size, crops_per_tile, augment=True):
+    def __init__(self, tiles, crop_size, crops_per_tile, augment=True, class_sampling=False):
         self.tiles = tiles
         self.crop_size = crop_size
         self.crops_per_tile = crops_per_tile
         self.augment = augment
-        self.points = [np.argwhere(tile["target"] == 1)[::37] for tile in tiles]
+        self.points = [
+            np.argwhere((tile["class_mask"] > 0) if class_sampling else (tile["target"] == 1))[::37]
+            for tile in tiles
+        ]
 
     def __len__(self):
         return len(self.tiles) * self.crops_per_tile

@@ -109,12 +109,17 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
     classifier = MaskedDINOClassifier(class_count).to(device)
     optimizer = torch.optim.AdamW(classifier.parameters(), lr=args.classifier_lr,
                                   weight_decay=args.classifier_weight_decay)
+    classifier_train_tiles = [tile for tile in train_tiles if tile["class_mask"].any()]
+    classifier_validation_tiles = [tile for tile in validation_tiles if tile["class_mask"].any()]
+    if not classifier_train_tiles:
+        raise ValueError("no COCO rooftop class polygons are available for classifier training")
     train_loader = DataLoader(
-        CropDataset(train_tiles, args.crop, args.n_per_tile),
+        CropDataset(classifier_train_tiles, args.crop, args.n_per_tile, class_sampling=True),
         args.bs, shuffle=True, num_workers=args.workers, drop_last=True,
     )
     validation_loader = (
-        DataLoader(CropDataset(validation_tiles, args.crop, args.n_per_tile, augment=False),
+        DataLoader(CropDataset(classifier_validation_tiles, args.crop, args.n_per_tile,
+                               augment=False, class_sampling=True),
                    args.bs, shuffle=False, num_workers=args.workers)
         if validation_tiles else None
     )

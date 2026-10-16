@@ -80,7 +80,13 @@ class HOTOSMNet(nn.Module):
 class MaskedDINOClassifier(nn.Module):
     def __init__(self, classes):
         super().__init__()
-        self.head = nn.Linear(384, classes)
+        self.head = nn.Sequential(
+            nn.LayerNorm(384),
+            nn.Linear(384, 256),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, classes),
+        )
 
     def forward(self, feature_map, building_mask):
         mask = F.interpolate(
