@@ -1,5 +1,6 @@
 """Training loop for the HOTOSM building decoder."""
 import time
+from copy import deepcopy
 from pathlib import Path
 
 import torch
@@ -20,6 +21,13 @@ def train(model, train_tiles, validation_tiles, args, device):
         raise RuntimeError("only the pretrained building decoder path may be trainable")
 
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=1e-2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=args.lr_factor,
+        patience=args.lr_patience,
+        min_lr=args.min_lr,
+    )
     loader = DataLoader(
         CropDataset(train_tiles, args.crop, args.n_per_tile),
         args.bs, shuffle=True, num_workers=args.workers, drop_last=True,
@@ -33,6 +41,8 @@ def train(model, train_tiles, validation_tiles, args, device):
         f"{Path(args.out).stem}_training"
     )
     history = []
+    best_validation_loss = float("inf")
+    best_state = None
 
     for epoch in range(args.epochs):
         started = time.perf_counter()
@@ -78,6 +88,16 @@ def train(model, train_tiles, validation_tiles, args, device):
                "duration_seconds": round(time.perf_counter() - started, 3)}
         history.append(row)
         save(history, metrics_dir)
+        if validation_loader:
+            scheduler.step(row["val_loss"])
+            if row["val_loss"] < best_validation_loss:
+                best_validation_loss = row["val_loss"]
+                best_state = deepcopy(model.state_dict())
+        else:
+            scheduler.step(row["train_loss"])
         print(f"epoch {row['epoch']:3d} train_loss={row['train_loss']:.4f} "
-              f"val_loss={row['val_loss']:.4f} val_iou={row['val_iou']:.4f} metrics={metrics_dir}", flush=True)
+              f"val_loss={row['val_loss']:.4f} val_iou={row['val_iou']:.4f} "
+              f"lr={optimizer.param_groups[0]['lr']:.2e} metrics={metrics_dir}", flush=True)
+    if best_state is not None:
+        model.load_state_dict(best_state)
     return history

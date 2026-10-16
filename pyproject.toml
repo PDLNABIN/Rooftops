@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 rooftops-finetune = "rooftops.finetune:main"
+rooftops-infer = "rooftops.infer:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -32,6 +32,7 @@ running the commands below.
 | `src/rooftops/data.py` | Building-only COCO/footprint loading and augmentation |
 | `src/rooftops/trainer.py` | Training and validation loop |
 | `src/rooftops/metrics.py` | Metrics, CSV/JSON persistence, and plots |
+| `src/rooftops/infer.py` | Building-mask inference and visualization |
 | `pyproject.toml` | Package metadata and console entry point |
 | `requirements.txt` | Python dependencies |
 
@@ -63,7 +64,11 @@ rooftops-finetune \
   --out dinov3s-buildings-finetuned.ckpt
 ```
 
-The memory-friendly defaults use one 256x256 crop per batch. BatchNorm layers
+The memory-friendly defaults use one 256x256 crop per batch. The default
+training horizon is 50 epochs. A validation-driven `ReduceLROnPlateau`
+scheduler halves the learning rate after 3 epochs without improvement. These
+values can be adjusted with `--lr_factor`, `--lr_patience`, and `--min_lr`.
+The best validation checkpoint is retained in the output checkpoint. BatchNorm layers
 use the pretrained running statistics so batch-size-one training is supported.
 For an 11.6 GiB GPU, keep those defaults; if memory is still insufficient,
 reduce the crop and decoder resolution together:
@@ -98,6 +103,21 @@ omitted, the union of roof polygons in the COCO annotations is used for
 annotated tiles. Building-only fine-tuning does not require material labels.
 The checkpoint is loaded strictly, so a mismatched architecture fails loudly
 instead of silently starting a new decoder.
+
+## Inference
+
+Run inference on a test image after fine-tuning:
+
+```bash
+python -m rooftops.infer \
+  --checkpoint dinov3s-buildings-finetuned.ckpt \
+  --image test_images/example.tif \
+  --out_dir inference
+```
+
+The inference output directory contains a binary building mask PNG, a red
+overlay PNG, and a NumPy probability map. Use `--threshold` to change the
+probability cutoff.
 
 ## Notes
 

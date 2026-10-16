@@ -16,12 +16,18 @@ def parse_args():
     parser.add_argument("--images", required=True)
     parser.add_argument("--footprints", help="directory of per-tile footprint targets")
     parser.add_argument("--out", default="dinov3s-buildings-finetuned.ckpt")
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--bs", type=int, default=1, help="reduce if CUDA runs out of memory")
     parser.add_argument("--n_per_tile", type=int, default=12)
     parser.add_argument("--crop", type=int, default=256)
     parser.add_argument("--input_size", type=int, default=256, help="decoder resolution; 256 is GPU-friendly")
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr_factor", type=float, default=0.5,
+                        help="multiply the learning rate after validation stalls")
+    parser.add_argument("--lr_patience", type=int, default=3,
+                        help="epochs without validation improvement before reducing learning rate")
+    parser.add_argument("--min_lr", type=float, default=1e-6,
+                        help="lower learning-rate bound")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--val_every", type=int, default=5)
     parser.add_argument("--seed", type=int, default=0)
