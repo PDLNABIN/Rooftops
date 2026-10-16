@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from roof_net import CropDS, fp_loss, load_tiles, split
+from hotosm_data import CropDataset, footprint_loss, load_tiles, split
 
 
 class Pyramid(nn.Module):
@@ -114,7 +114,7 @@ def main():
         raise RuntimeError("DINOv3 must remain frozen")
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=1e-2)
     loader = DataLoader(
-        CropDS(train_tiles, args.crop, args.n_per_tile),
+        CropDataset(train_tiles, args.crop, args.n_per_tile),
         args.bs,
         shuffle=True,
         num_workers=args.workers,
@@ -125,12 +125,13 @@ def main():
         model.train()
         model.net.backbone.eval()
         total = 0.0
-        for x, _, _, target, _ in loader:
+        for x, target in loader:
             x, target = x.to(device), target.to(device)
             x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
             with torch.autocast(device, enabled=device == "cuda"):
                 logits = model(x)
-                loss = fp_loss(logits, F.interpolate(target[:, None].float(), size=logits.shape[-2:], mode="nearest")[:, 0].long())
+                target = F.interpolate(target[:, None].float(), size=logits.shape[-2:], mode="nearest")[:, 0].long()
+                loss = footprint_loss(logits, target)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

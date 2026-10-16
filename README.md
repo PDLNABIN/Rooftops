@@ -1,15 +1,8 @@
-# Roof Material Segmentation
+# HOTOSM DINOv3 Building Fine-Tuning
 
-PyTorch tools for training and running roof-material segmentation models inside
-building footprints. The project supports four roof-material classes:
-
-- CGI
-- Concrete
-- Tarpaulin
-- Tile
-
-The segmentation pipeline uses a DINOv3 ViT backbone and can export material
-rasters, per-building statistics, and GeoJSON roof-part polygons.
+Fine-tune the pretrained HOTOSM DINOv3 ViT-S/16 building-segmentation model.
+The DINOv3 backbone stays frozen while the pretrained TerraTorch UPerNet
+decoder and segmentation head are updated on local building labels.
 
 ## Requirements
 
@@ -30,60 +23,17 @@ The repository intentionally excludes local imagery, annotations, checkpoints,
 and generated outputs. Place those assets in your local working tree before
 running the commands below.
 
-## Training
-
-Training expects COCO-format roof annotations and a directory of image tiles:
-
-```bash
-python Roff.py train \
-  --coco path/to/instances_default.json \
-  --images path/to/images \
-  --out roof_seg.pt
-```
-
-Useful options include `--epochs`, `--batch-size` (exposed as `--bs`),
-`--unfreeze_last`, `--crop`, and `--input_size`. Training charts and history
-are written next to the checkpoint.
-
-## Prediction
-
-Prediction accepts a tile or image directory and building footprints supplied
-as GeoJSON, a binary raster, or a directory of per-tile footprint files:
-
-```bash
-python Roff.py predict \
-  --image path/to/images \
-  --footprints path/to/footprints \
-  --weights roof_seg.pt \
-  --out_dir predictions
-```
-
-Use `--tta` to enable four-rotation test-time augmentation. Predictions
-include material rasters, overlays, building statistics, and roof-part
-polygons.
-
-## Charts
-
-To generate instance-count charts from COCO annotations:
-
-```bash
-python Roff.py charts \
-  --coco path/to/instances_default.json \
-  --out_dir charts
-```
-
 ## Project layout
 
 | Path | Purpose |
 | --- | --- |
-| `Roff.py` | Command-line entry point |
-| `roofseg/` | Reusable data, model, training, inference, and export modules |
-| `roof_net.py` | Standalone footprint/material training and inference pipeline |
+| `hotosm_finetune.py` | HOTOSM checkpoint loading and fine-tuning entry point |
+| `hotosm_data.py` | Building-only COCO/footprint data loading and loss |
 | `requirements.txt` | Python dependencies |
 
-## Two-stage training
+## Fine-tuning
 
-For building detection, fine-tune the pretrained UPerNet from
+Fine-tune the pretrained UPerNet from
 [`hotosm/dinov3s-buildings`](https://huggingface.co/hotosm/dinov3s-buildings).
 Download its `model.ckpt` file separately; it is intentionally not included in
 this repository. TerraTorch reconstructs the checkpoint's UPerNet decoder and
@@ -105,26 +55,7 @@ annotated tiles. Building-only fine-tuning does not require material labels.
 The checkpoint is loaded strictly, so a mismatched architecture fails loudly
 instead of silently starting a new decoder.
 
-The existing `roof_net.py` command remains available for the separate
-roof-material experiment. It does not load the HOTOSM UPerNet checkpoint.
-
-```bash
-python roof_net.py train \
-  --coco path/to/instances_default.json \
-  --images path/to/images \
-  --init roofnet_footprints.pt \
-  --train_heads mat,cls \
-  --out roofnet.pt
-```
-
 ## Notes
-
-The DINOv3 backbone may require accepting the model license and authenticating
-with Hugging Face before training:
-
-```bash
-huggingface-cli login
-```
 
 Model checkpoints and datasets are not included in this repository. Make sure
 you have permission to use and redistribute any imagery, annotations, model
