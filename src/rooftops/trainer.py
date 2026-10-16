@@ -140,10 +140,11 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         for x, target, class_target in progress:
             x, target, class_target = x.to(device), target.to(device), class_target.to(device)
             x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
-            with torch.no_grad():
+            with torch.inference_mode(), torch.autocast(device, enabled=device == "cuda"):
                 features = model.backbone_features(x)
-            logits = classifier(features, target)
-            loss = F.cross_entropy(logits, class_target)
+            with torch.autocast(device, enabled=device == "cuda"):
+                logits = classifier(features, target)
+                loss = F.cross_entropy(logits, class_target)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -158,7 +159,7 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         validation_total = 0
         if validation_loader:
             classifier.eval()
-            with torch.no_grad():
+            with torch.inference_mode(), torch.autocast(device, enabled=device == "cuda"):
                 for x, target, class_target in validation_loader:
                     x, target, class_target = x.to(device), target.to(device), class_target.to(device)
                     x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
@@ -176,4 +177,6 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         print(f"roof classifier epoch {epoch + 1:3d} train_loss={history[-1]['train_loss']:.4f} "
               f"val_loss={history[-1]['val_loss']:.4f} val_accuracy={history[-1]['val_accuracy']:.4f}",
               flush=True)
+    if device == "cuda":
+        torch.cuda.empty_cache()
     return classifier, history

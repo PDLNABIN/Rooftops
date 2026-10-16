@@ -463,6 +463,24 @@ Close other GPU applications before training. The frozen DINOv3 backbone is
 run without gradient tracking, but it still requires memory for feature
 extraction.
 
+If the error reports only a few megabytes free, another process is already
+using the GPU. Check the active processes before starting training:
+
+```bash
+nvidia-smi
+```
+
+Stop only an unrelated process shown by `nvidia-smi`, or run on CPU when no
+GPU is available:
+
+```bash
+CUDA_VISIBLE_DEVICES="" python -m rooftops --config config.yaml
+```
+
+The classifier and inference paths use `torch.inference_mode()` and CUDA
+automatic mixed precision. The training command also releases the CUDA cache
+between the segmentation and classifier stages.
+
 ## Troubleshooting
 
 ### `ModuleNotFoundError: No module named 'rooftops'`

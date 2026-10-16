@@ -44,7 +44,7 @@ def infer(model, classifier, class_names, image_path, out_dir, input_size, thres
         tensor, size=(input_size, input_size), mode="bilinear", align_corners=False
     ).to(device)
     model.eval()
-    with torch.no_grad():
+    with torch.inference_mode(), torch.autocast(device, enabled=device == "cuda"):
         features = model.backbone_features(tensor)
         probability = model(tensor)[:, 0].sigmoid()
         probability = torch.nn.functional.interpolate(

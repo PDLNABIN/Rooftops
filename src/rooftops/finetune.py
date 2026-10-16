@@ -68,6 +68,8 @@ def main():
 
     model = load_pretrained(args.checkpoint, device)
     train(model, train_tiles, validation_tiles, args, device)
+    if device == "cuda":
+        torch.cuda.empty_cache()
     class_names = train_tiles[0].get("class_names", {})
     if not class_names:
         raise SystemExit("COCO categories are required to train the rooftop classifier")
