@@ -59,6 +59,12 @@ class HOTOSMNet(nn.Module):
             nn.Conv2d(512, 3, 1),
         )
 
+    def freeze_batchnorm_stats(self):
+        """Use pretrained BatchNorm statistics so batch-size-one training is valid."""
+        for module in self.modules():
+            if isinstance(module, nn.modules.batchnorm._BatchNorm):
+                module.eval()
+
     def forward(self, x):
         height, width = x.shape[-2:]
         with torch.no_grad():
@@ -131,6 +137,7 @@ def main():
     for epoch in range(args.epochs):
         model.train()
         model.net.backbone.eval()
+        model.freeze_batchnorm_stats()
         total = 0.0
         for x, target in loader:
             x, target = x.to(device), target.to(device)

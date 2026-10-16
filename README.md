@@ -60,9 +60,10 @@ rooftops-finetune \
   --out dinov3s-buildings-finetuned.ckpt
 ```
 
-The memory-friendly defaults use one 256x256 crop per batch. For an 11.6 GiB
-GPU, keep those defaults; if memory is still insufficient, reduce the crop and
-decoder resolution together:
+The memory-friendly defaults use one 256x256 crop per batch. BatchNorm layers
+use the pretrained running statistics so batch-size-one training is supported.
+For an 11.6 GiB GPU, keep those defaults; if memory is still insufficient,
+reduce the crop and decoder resolution together:
 
 ```bash
 python -m rooftops \
