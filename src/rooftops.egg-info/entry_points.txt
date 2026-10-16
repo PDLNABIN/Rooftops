@@ -1,0 +1,2 @@
+[console_scripts]
+rooftops-finetune = rooftops.finetune:main

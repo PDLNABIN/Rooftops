@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/rooftops/__init__.py
+src/rooftops/__main__.py
+src/rooftops/data.py
+src/rooftops/finetune.py
+src/rooftops.egg-info/PKG-INFO
+src/rooftops.egg-info/SOURCES.txt
+src/rooftops.egg-info/dependency_links.txt
+src/rooftops.egg-info/entry_points.txt
+src/rooftops.egg-info/requires.txt
+src/rooftops.egg-info/top_level.txt

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from hotosm_data import CropDataset, footprint_loss, load_tiles, split
+from .data import CropDataset, footprint_loss, load_tiles, split
 
 
 class Pyramid(nn.Module):

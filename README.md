@@ -27,8 +27,9 @@ running the commands below.
 
 | Path | Purpose |
 | --- | --- |
-| `hotosm_finetune.py` | HOTOSM checkpoint loading and fine-tuning entry point |
-| `hotosm_data.py` | Building-only COCO/footprint data loading and loss |
+| `src/rooftops/finetune.py` | HOTOSM checkpoint loading and fine-tuning entry point |
+| `src/rooftops/data.py` | Building-only COCO/footprint data loading and loss |
+| `pyproject.toml` | Package metadata and console entry point |
 | `requirements.txt` | Python dependencies |
 
 ## Fine-tuning
@@ -40,11 +41,22 @@ this repository. TerraTorch reconstructs the checkpoint's UPerNet decoder and
 learned feature pyramid, while every DINOv3 parameter remains frozen:
 
 ```bash
-python hotosm_finetune.py \
+python -m rooftops \
   --checkpoint path/to/model.ckpt \
   --coco path/to/instances_default.json \
   --images path/to/images \
   --footprints path/to/footprint_targets \
+  --out dinov3s-buildings-finetuned.ckpt
+```
+
+After installing the project with `python -m pip install -e .`, the equivalent
+console command is:
+
+```bash
+rooftops-finetune \
+  --checkpoint path/to/model.ckpt \
+  --coco path/to/instances_default.json \
+  --images path/to/images \
   --out dinov3s-buildings-finetuned.ckpt
 ```
 
