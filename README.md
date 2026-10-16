@@ -253,13 +253,18 @@ Important settings:
 - `lr_factor`: multiplier applied when validation loss stalls.
 - `lr_patience`: number of stagnant validation epochs before reducing LR.
 - `min_lr`: lower bound for the adaptive learning rate.
+- `early_stopping_patience`: validation epochs without improvement before stopping. Set `0` to disable.
+- `early_stopping_min_delta`: minimum validation-loss improvement counted as progress.
 - `val_every`: validation split period. Set `0` to disable validation.
 - `classifier_epochs`: rooftop-classifier training epochs.
 - `classifier_lr`: classifier learning rate.
 - `classifier_weight_decay`: classifier AdamW weight decay.
 
 The segmentation optimizer uses `ReduceLROnPlateau`. The best validation
-segmentation weights are restored before the classifier stage begins.
+segmentation weights are restored before the classifier stage begins. Both
+the segmentation and rooftop-classifier stages use early stopping by default
+after 8 validation epochs without meaningful improvement, and restore their
+best validation weights. Set `early_stopping_patience: 0` to run all epochs.
 
 ### Inference settings
 

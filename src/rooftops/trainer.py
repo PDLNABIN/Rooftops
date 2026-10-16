@@ -43,6 +43,7 @@ def train(model, train_tiles, validation_tiles, args, device):
     history = []
     best_validation_loss = float("inf")
     best_state = None
+    epochs_without_improvement = 0
 
     for epoch in range(args.epochs):
         started = time.perf_counter()
@@ -90,17 +91,27 @@ def train(model, train_tiles, validation_tiles, args, device):
         save(history, metrics_dir)
         if validation_loader:
             scheduler.step(row["val_loss"])
-            if row["val_loss"] < best_validation_loss:
+            if row["val_loss"] < best_validation_loss - args.early_stopping_min_delta:
                 best_validation_loss = row["val_loss"]
+                epochs_without_improvement = 0
                 best_state = {
                     name: parameter.detach().cpu().clone()
                     for name, parameter in model.state_dict().items()
                 }
+            else:
+                epochs_without_improvement += 1
         else:
             scheduler.step(row["train_loss"])
         print(f"epoch {row['epoch']:3d} train_loss={row['train_loss']:.4f} "
               f"val_loss={row['val_loss']:.4f} val_iou={row['val_iou']:.4f} "
               f"lr={optimizer.param_groups[0]['lr']:.2e} metrics={metrics_dir}", flush=True)
+        if validation_loader and args.early_stopping_patience > 0 and (
+            epochs_without_improvement >= args.early_stopping_patience
+        ):
+            print(f"early stopping segmentation after epoch {row['epoch']} "
+                  f"({args.early_stopping_patience} epochs without validation improvement)",
+                  flush=True)
+            break
     if best_state is not None:
         model.load_state_dict(best_state)
     return history
@@ -130,6 +141,9 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         if validation_tiles else None
     )
     history = []
+    best_validation_loss = float("inf")
+    best_state = None
+    epochs_without_improvement = 0
     metrics_dir = Path(args.metrics_dir) if args.metrics_dir else Path(args.out).with_suffix("").parent / (
         f"{Path(args.out).stem}_training"
     )
@@ -179,6 +193,25 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         print(f"roof classifier epoch {epoch + 1:3d} train_loss={history[-1]['train_loss']:.4f} "
               f"val_loss={history[-1]['val_loss']:.4f} val_accuracy={history[-1]['val_accuracy']:.4f}",
               flush=True)
+        if validation_loader:
+            if history[-1]["val_loss"] < best_validation_loss - args.early_stopping_min_delta:
+                best_validation_loss = history[-1]["val_loss"]
+                epochs_without_improvement = 0
+                best_state = {
+                    name: parameter.detach().cpu().clone()
+                    for name, parameter in classifier.state_dict().items()
+                }
+            else:
+                epochs_without_improvement += 1
+            if args.early_stopping_patience > 0 and (
+                epochs_without_improvement >= args.early_stopping_patience
+            ):
+                print(f"early stopping rooftop classifier after epoch {epoch + 1} "
+                      f"({args.early_stopping_patience} epochs without validation improvement)",
+                      flush=True)
+                break
+    if best_state is not None:
+        classifier.load_state_dict(best_state)
     if device == "cuda":
         torch.cuda.empty_cache()
     return classifier, history

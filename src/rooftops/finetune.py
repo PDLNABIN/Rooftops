@@ -37,6 +37,10 @@ def parse_args():
     parser.add_argument("--val_every", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--metrics_dir")
+    parser.add_argument("--early_stopping_patience", type=int,
+                        help="stop after this many validation epochs without improvement; 0 disables")
+    parser.add_argument("--early_stopping_min_delta", type=float,
+                        help="minimum validation-loss improvement to reset patience")
     parser.add_argument("--classifier_epochs", type=int)
     parser.add_argument("--classifier_lr", type=float)
     parser.add_argument("--classifier_weight_decay", type=float)
@@ -47,6 +51,7 @@ def parse_args():
         "n_per_tile": 12, "crop": 256, "input_size": 256, "lr": 1e-4,
         "lr_factor": 0.5, "lr_patience": 3, "min_lr": 1e-6, "workers": 0,
         "val_every": 5, "seed": 0,
+        "early_stopping_patience": 8, "early_stopping_min_delta": 1e-4,
         "classifier_epochs": 20, "classifier_lr": 1e-3,
         "classifier_weight_decay": 1e-2,
     }

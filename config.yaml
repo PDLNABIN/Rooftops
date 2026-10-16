@@ -19,6 +19,8 @@ training:
   val_every: 5
   seed: 0
   metrics_dir:
+  early_stopping_patience: 8
+  early_stopping_min_delta: 0.0001
   classifier_epochs: 20
   classifier_lr: 0.001
   classifier_weight_decay: 0.01
