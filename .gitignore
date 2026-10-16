@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Training data and local geospatial assets
+Images/
+test_images/
+annot/
+test_annot/
+
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Generated charts and inference/training outputs
+charts/
+test_charts/
+roof_seg_charts/
+roofnet_out/
+roofseg_out/
+roofseg_test_out/
