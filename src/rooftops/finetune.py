@@ -44,6 +44,10 @@ def parse_args():
     parser.add_argument("--classifier_epochs", type=int)
     parser.add_argument("--classifier_lr", type=float)
     parser.add_argument("--classifier_weight_decay", type=float)
+    parser.add_argument("--classifier_lr_factor", type=float)
+    parser.add_argument("--classifier_lr_patience", type=int)
+    parser.add_argument("--classifier_min_lr", type=float)
+    parser.add_argument("--classifier_label_smoothing", type=float)
     parsed = vars(parser.parse_args())
     config = load_section(parsed["config"] or config_args.config, "training")
     defaults = {
@@ -54,6 +58,8 @@ def parse_args():
         "early_stopping_patience": 8, "early_stopping_min_delta": 1e-4,
         "classifier_epochs": 20, "classifier_lr": 1e-3,
         "classifier_weight_decay": 1e-2,
+        "classifier_lr_factor": 0.5, "classifier_lr_patience": 3,
+        "classifier_min_lr": 1e-6, "classifier_label_smoothing": 0.05,
     }
     values = {**defaults, **config}
     values.update({key: value for key, value in parsed.items() if value is not None})

@@ -24,6 +24,10 @@ training:
   classifier_epochs: 20
   classifier_lr: 0.001
   classifier_weight_decay: 0.01
+  classifier_lr_factor: 0.5
+  classifier_lr_patience: 3
+  classifier_min_lr: 0.000001
+  classifier_label_smoothing: 0.05
 
 inference:
   checkpoint: dinov3s-buildings-finetuned.ckpt

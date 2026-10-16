@@ -55,7 +55,7 @@ def save(history, directory):
         axis.legend()
         fig.savefig(directory / f"{filename}.png", dpi=160, bbox_inches="tight")
         plt.close(fig)
-    fig, axis = plt.subplots(figsize=(9, 5))
+        fig, axis = plt.subplots(figsize=(9, 5))
     axis.plot(epochs, [row["learning_rate"] for row in history],
               marker="o", label="segmentation learning rate")
     axis.set(xlabel="Epoch", ylabel="Learning rate", title="Learning rate")
@@ -63,3 +63,30 @@ def save(history, directory):
     axis.legend(loc="best")
     fig.savefig(directory / "learning_rate.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
+
+
+def save_classifier(history, directory):
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "classifier_metrics.json").write_text(json.dumps(history, indent=2))
+    with (directory / "classifier_metrics.csv").open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(history[0]))
+        writer.writeheader()
+        writer.writerows(history)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    epochs = [row["epoch"] for row in history]
+    for filename, train_key, val_key, ylabel in (
+        ("classifier_loss", "train_loss", "val_loss", "Classifier loss"),
+        ("classifier_accuracy", "train_accuracy", "val_accuracy", "Classifier accuracy"),
+    ):
+        figure, axis = plt.subplots(figsize=(9, 5))
+        axis.plot(epochs, [row[train_key] for row in history], marker="o", label="train")
+        axis.plot(epochs, [row[val_key] for row in history], marker="o", label="validation")
+        axis.set(xlabel="Epoch", ylabel=ylabel, title=ylabel)
+        axis.grid(alpha=0.25)
+        axis.legend()
+        figure.savefig(directory / f"{filename}.png", dpi=160, bbox_inches="tight")
+        plt.close(figure)

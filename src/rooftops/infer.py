@@ -131,6 +131,7 @@ def main():
         raise SystemExit("checkpoint does not contain rooftop class names; retrain with the classifier head")
     class_names = {int(key): value for key, value in raw_names.items()}
     classifier = load_classification_head(args.checkpoint, device, len(class_names))
+    classifier.eval()
     for path in image_paths:
         output = infer(model, classifier, class_names, path, args.out_dir,
                        args.input_size, args.threshold, device)

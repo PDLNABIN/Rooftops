@@ -132,6 +132,9 @@ The directory contains:
 - `iou.png`
 - `f1.png`
 - `learning_rate.png`
+- `classifier_metrics.json` and `classifier_metrics.csv`
+- `classifier_loss.png`
+- `classifier_accuracy.png`
 
 All training plots include explicit legends identifying the training,
 validation, or learning-rate series.
@@ -259,12 +262,24 @@ Important settings:
 - `classifier_epochs`: rooftop-classifier training epochs.
 - `classifier_lr`: classifier learning rate.
 - `classifier_weight_decay`: classifier AdamW weight decay.
+- `classifier_lr_factor`: multiplier applied when classifier validation loss stalls.
+- `classifier_lr_patience`: stagnant classifier validation epochs before reducing LR.
+- `classifier_min_lr`: lower bound for the classifier learning rate.
+- `classifier_label_smoothing`: label-smoothing factor for classifier cross-entropy.
 
 The segmentation optimizer uses `ReduceLROnPlateau`. The best validation
 segmentation weights are restored before the classifier stage begins. Both
 the segmentation and rooftop-classifier stages use early stopping by default
 after 8 validation epochs without meaningful improvement, and restore their
 best validation weights. Set `early_stopping_patience: 0` to run all epochs.
+The classifier also uses inverse-frequency class weights, label smoothing, and
+its own `ReduceLROnPlateau` scheduler to reduce majority-class bias and
+overconfident validation predictions.
+Classifier crops isolate the single labeled building associated with each
+rooftop class sample, preventing neighboring buildings from contaminating the
+pooled feature target. Segmentation training also includes random
+background/context crops, and validation tiles use an interleaved split rather
+than contiguous tile blocks.
 
 For example, to stop sooner when validation loss stalls:
 

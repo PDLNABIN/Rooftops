@@ -2,13 +2,14 @@
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from .data import CropDataset, footprint_loss
-from .metrics import save, summarize, update_counts
+from .metrics import save, save_classifier, summarize, update_counts
 from .model import MaskedDINOClassifier, freeze_all
 
 
@@ -126,10 +127,23 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         raise RuntimeError("the rooftop classifier head must be trainable")
     optimizer = torch.optim.AdamW(classifier.parameters(), lr=args.classifier_lr,
                                   weight_decay=args.classifier_weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=args.classifier_lr_factor,
+        patience=args.classifier_lr_patience, min_lr=args.classifier_min_lr,
+    )
     classifier_train_tiles = [tile for tile in train_tiles if tile["class_mask"].any()]
     classifier_validation_tiles = [tile for tile in validation_tiles if tile["class_mask"].any()]
     if not classifier_train_tiles:
         raise ValueError("no COCO rooftop class polygons are available for classifier training")
+    class_counts = np.zeros(class_count, dtype=np.float64)
+    for tile in classifier_train_tiles:
+        values, counts = np.unique(tile["class_mask"], return_counts=True)
+        for value, count in zip(values, counts):
+            if 1 <= value <= class_count:
+                class_counts[value - 1] += count
+    class_weights = class_counts.sum() / np.maximum(class_counts, 1)
+    class_weights /= class_weights.mean()
+    class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
     train_loader = DataLoader(
         CropDataset(classifier_train_tiles, args.crop, args.n_per_tile, class_sampling=True),
         args.bs, shuffle=True, num_workers=args.workers, drop_last=True,
@@ -138,7 +152,7 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
         DataLoader(CropDataset(classifier_validation_tiles, args.crop, args.n_per_tile,
                                augment=False, class_sampling=True),
                    args.bs, shuffle=False, num_workers=args.workers)
-        if validation_tiles else None
+        if classifier_validation_tiles else None
     )
     history = []
     best_validation_loss = float("inf")
@@ -160,7 +174,10 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
                 features = model.backbone_features(x)
             with torch.autocast(device, enabled=device == "cuda"):
                 logits = classifier(features, target)
-                loss = F.cross_entropy(logits, class_target)
+                loss = F.cross_entropy(
+                    logits, class_target, weight=class_weights,
+                    label_smoothing=args.classifier_label_smoothing,
+                )
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -180,7 +197,10 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
                     x, target, class_target = x.to(device), target.to(device), class_target.to(device)
                     x = F.interpolate(x, size=args.input_size, mode="bilinear", align_corners=False)
                     logits = classifier(model.backbone_features(x), target)
-                    validation_loss += float(F.cross_entropy(logits, class_target))
+                    validation_loss += float(F.cross_entropy(
+                        logits, class_target, weight=class_weights,
+                        label_smoothing=args.classifier_label_smoothing,
+                    ))
                     validation_correct += int((logits.argmax(1) == class_target).sum())
                     validation_total += class_target.numel()
         history.append({
@@ -189,7 +209,10 @@ def train_rooftop_classifier(model, train_tiles, validation_tiles, args, device,
             "train_accuracy": train_correct / max(train_total, 1),
             "val_loss": validation_loss / max(len(validation_loader) if validation_loader else 1, 1),
             "val_accuracy": validation_correct / max(validation_total, 1),
+            "learning_rate": optimizer.param_groups[0]["lr"],
         })
+        save_classifier(history, metrics_dir)
+        scheduler.step(history[-1]["val_loss"])
         print(f"roof classifier epoch {epoch + 1:3d} train_loss={history[-1]['train_loss']:.4f} "
               f"val_loss={history[-1]['val_loss']:.4f} val_accuracy={history[-1]['val_accuracy']:.4f}",
               flush=True)

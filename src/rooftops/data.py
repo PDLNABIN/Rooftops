@@ -128,7 +128,7 @@ def split(tiles, validation_period):
         return tiles, []
     train, validation = [], []
     for index, tile in enumerate(tiles):
-        (validation if (index // 10) % validation_period == 0 else train).append(tile)
+        (validation if index % validation_period == 0 else train).append(tile)
     return train, validation
 
 
@@ -138,6 +138,7 @@ class CropDataset(Dataset):
         self.crop_size = crop_size
         self.crops_per_tile = crops_per_tile
         self.augment = augment
+        self.class_sampling = class_sampling
         self.points = [
             np.argwhere((tile["class_mask"] > 0) if class_sampling else (tile["target"] == 1))[::37]
             for tile in tiles
@@ -164,11 +165,29 @@ class CropDataset(Dataset):
                 py, px = height // 2, width // 2
         if height < self.crop_size or width < self.crop_size:
             raise ValueError(f"crop size {self.crop_size} exceeds tile shape {(height, width)}")
-        jitter = self.crop_size // 4 if self.augment else 0
-        y = int(np.clip(py - self.crop_size // 2 + random.randint(-jitter, jitter), 0, height - self.crop_size))
-        x = int(np.clip(px - self.crop_size // 2 + random.randint(-jitter, jitter), 0, width - self.crop_size))
+        if not self.class_sampling and self.augment and random.random() < 0.15:
+            y = random.randrange(0, height - self.crop_size + 1)
+            x = random.randrange(0, width - self.crop_size + 1)
+        else:
+            jitter = self.crop_size // 4 if self.augment else 0
+            y = int(np.clip(py - self.crop_size // 2 + random.randint(-jitter, jitter), 0, height - self.crop_size))
+            x = int(np.clip(px - self.crop_size // 2 + random.randint(-jitter, jitter), 0, width - self.crop_size))
         image = tile["rgb"][y:y + self.crop_size, x:x + self.crop_size].astype(np.float32) / 255
-        target = tile["target"][y:y + self.crop_size, x:x + self.crop_size]
+        target = tile["target"][y:y + self.crop_size, x:x + self.crop_size].copy()
+        class_target = self.tile_class_target(tile, py, px)
+        if self.class_sampling:
+            class_crop = tile["class_mask"][y:y + self.crop_size, x:x + self.crop_size]
+            local_y = int(np.clip(py - y, 0, self.crop_size - 1))
+            local_x = int(np.clip(px - x, 0, self.crop_size - 1))
+            same_class = (class_crop == class_target + 1) & (target > 0)
+            labeled, _ = ndi.label(same_class if same_class.any() else (target > 0))
+            component_id = labeled[local_y, local_x]
+            if component_id > 0:
+                target = (labeled == component_id).astype(np.uint8)
+            elif same_class.any():
+                target = same_class.astype(np.uint8)
+            else:
+                target = (target > 0).astype(np.uint8)
         if self.augment:
             if random.random() < 0.5:
                 image, target = image[:, ::-1], target[:, ::-1]
