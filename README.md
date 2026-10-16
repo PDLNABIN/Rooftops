@@ -115,9 +115,19 @@ python -m rooftops.infer \
   --out_dir inference
 ```
 
-The inference output directory contains a binary building mask PNG, a red
-overlay PNG, and a NumPy probability map. Use `--threshold` to change the
-probability cutoff.
+The inference output directory contains one labeled three-panel PNG for each
+input image: the original image, binary building mask, and red overlay. It
+also saves a NumPy probability map for each image. To process every supported
+image in a test directory, pass the directory instead:
+
+```bash
+python -m rooftops.infer \
+  --checkpoint dinov3s-buildings-finetuned.ckpt \
+  --image test_images \
+  --out_dir inference_all
+```
+
+Use `--threshold` to change the probability cutoff.
 
 ## Notes
 

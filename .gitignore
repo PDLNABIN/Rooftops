@@ -37,3 +37,7 @@ roof_seg_charts/
 roofnet_out/
 roofseg_out/
 roofseg_test_out/
+inference/
+inference_all/
+inference_preview/
+*_training/
