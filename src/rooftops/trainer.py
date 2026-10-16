@@ -25,7 +25,7 @@ def train(model, train_tiles, validation_tiles, args, device):
         args.bs, shuffle=True, num_workers=args.workers, drop_last=True,
     )
     validation_loader = (
-        DataLoader(CropDataset(validation_tiles, args.crop, args.n_per_tile),
+        DataLoader(CropDataset(validation_tiles, args.crop, args.n_per_tile, augment=False),
                    args.bs, shuffle=False, num_workers=args.workers)
         if validation_tiles else None
     )

@@ -80,6 +80,8 @@ python -m rooftops \
 ```
 
 Training displays a batch progress bar and writes metrics after every epoch.
+Validation uses fixed, augmentation-free crops so validation metrics are
+comparable between epochs; training crops remain randomized and augmented.
 By default, artifacts are saved in
 `dinov3s-buildings-finetuned_training/`; override this with `--metrics_dir`.
 The directory contains:

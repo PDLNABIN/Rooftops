@@ -115,10 +115,11 @@ def split(tiles, validation_period):
 
 
 class CropDataset(Dataset):
-    def __init__(self, tiles, crop_size, crops_per_tile):
+    def __init__(self, tiles, crop_size, crops_per_tile, augment=True):
         self.tiles = tiles
         self.crop_size = crop_size
         self.crops_per_tile = crops_per_tile
+        self.augment = augment
         self.points = [np.argwhere(tile["target"] == 1)[::37] for tile in tiles]
 
     def __len__(self):
@@ -129,23 +130,32 @@ class CropDataset(Dataset):
         height, width = tile["target"].shape
         points = self.points[index // self.crops_per_tile]
         if len(points):
-            py, px = points[random.randrange(len(points))]
+            point_index = (
+                random.randrange(len(points))
+                if self.augment
+                else index % self.crops_per_tile % len(points)
+            )
+            py, px = points[point_index]
         else:
-            py, px = random.randrange(height), random.randrange(width)
+            if self.augment:
+                py, px = random.randrange(height), random.randrange(width)
+            else:
+                py, px = height // 2, width // 2
         if height < self.crop_size or width < self.crop_size:
             raise ValueError(f"crop size {self.crop_size} exceeds tile shape {(height, width)}")
-        jitter = self.crop_size // 4
+        jitter = self.crop_size // 4 if self.augment else 0
         y = int(np.clip(py - self.crop_size // 2 + random.randint(-jitter, jitter), 0, height - self.crop_size))
         x = int(np.clip(px - self.crop_size // 2 + random.randint(-jitter, jitter), 0, width - self.crop_size))
         image = tile["rgb"][y:y + self.crop_size, x:x + self.crop_size].astype(np.float32) / 255
         target = tile["target"][y:y + self.crop_size, x:x + self.crop_size]
-        if random.random() < 0.5:
-            image, target = image[:, ::-1], target[:, ::-1]
-        if random.random() < 0.5:
-            image, target = image[::-1], target[::-1]
-        rotation = random.randint(0, 3)
-        image, target = np.rot90(image, rotation), np.rot90(target, rotation)
-        image = np.clip(image * random.uniform(0.8, 1.2) + random.uniform(-0.08, 0.08), 0, 1)
+        if self.augment:
+            if random.random() < 0.5:
+                image, target = image[:, ::-1], target[:, ::-1]
+            if random.random() < 0.5:
+                image, target = image[::-1], target[::-1]
+            rotation = random.randint(0, 3)
+            image, target = np.rot90(image, rotation), np.rot90(target, rotation)
+            image = np.clip(image * random.uniform(0.8, 1.2) + random.uniform(-0.08, 0.08), 0, 1)
         image = (image - MEAN) / STD
         tensor = lambda value, dtype: torch.from_numpy(np.ascontiguousarray(value).astype(dtype))
         return tensor(image.transpose(2, 0, 1), np.float32), tensor(target, np.int64)
