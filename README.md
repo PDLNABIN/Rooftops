@@ -266,6 +266,35 @@ the segmentation and rooftop-classifier stages use early stopping by default
 after 8 validation epochs without meaningful improvement, and restore their
 best validation weights. Set `early_stopping_patience: 0` to run all epochs.
 
+For example, to stop sooner when validation loss stalls:
+
+```yaml
+training:
+  epochs: 50
+  classifier_epochs: 20
+  early_stopping_patience: 4
+  early_stopping_min_delta: 0.0001
+```
+
+To disable early stopping and run every configured epoch:
+
+```yaml
+training:
+  early_stopping_patience: 0
+```
+
+The same settings can be overridden without editing the YAML file:
+
+```bash
+python -m rooftops \
+  --config config.yaml \
+  --early_stopping_patience 4 \
+  --early_stopping_min_delta 0.0001
+```
+
+When early stopping triggers, the terminal reports which stage stopped and
+how many validation epochs had no meaningful improvement.
+
 ### Inference settings
 
 ```yaml
