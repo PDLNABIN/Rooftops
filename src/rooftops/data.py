@@ -14,6 +14,7 @@ IGNORE = 255
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
 IMAGE_EXTENSIONS = {".tif", ".tiff", ".png", ".jpg", ".jpeg"}
+IGNORED_ROOFTOP_CLASSES = {"Mud"}
 
 
 def read_image(path):
@@ -78,14 +79,12 @@ def load_external_footprint(path, shape, threshold=0):
 def load_tiles(coco_path, image_dir, footprint_dir=None):
     with Path(coco_path).open() as source:
         coco = json.load(source)
-    category_ids = {
-        category["id"]: index + 1
-        for index, category in enumerate(sorted(coco.get("categories", []), key=lambda item: item["id"]))
-    }
-    category_names = {
-        index: category["name"]
-        for index, category in enumerate(sorted(coco.get("categories", []), key=lambda item: item["id"]))
-    }
+    categories = [
+        category for category in sorted(coco.get("categories", []), key=lambda item: item["id"])
+        if category["name"] not in IGNORED_ROOFTOP_CLASSES
+    ]
+    category_ids = {category["id"]: index + 1 for index, category in enumerate(categories)}
+    category_names = {index: category["name"] for index, category in enumerate(categories)}
     annotations = {}
     for annotation in coco["annotations"]:
         annotations.setdefault(annotation["image_id"], []).append(annotation)

@@ -283,7 +283,10 @@ DINOv3/UPerNet model and trains a separate rooftop-material classifier. The
 classifier uses masked average pooling of frozen DINOv3 features inside each
 provided building footprint during training, while class samples are selected
 from labeled COCO rooftop polygons. The included COCO categories are `CGI`,
-`Concrete`, `Mud`, `Tarpaulin`, and `Tile`. Its settings are controlled by
+`Concrete`, `Mud`, `Tarpaulin`, and `Tile`; `Mud` is intentionally ignored by
+the rooftop classifier because it has insufficient labeled examples. The
+classifier therefore predicts only `CGI`, `Concrete`, `Tarpaulin`, and `Tile`.
+Its settings are controlled by
 `classifier_epochs`, `classifier_lr`, and `classifier_weight_decay`.
 Only one stage is trainable at a time: the building segmentation stage runs
 first, then its complete model is frozen before the rooftop classifier stage
