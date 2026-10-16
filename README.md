@@ -27,8 +27,11 @@ running the commands below.
 
 | Path | Purpose |
 | --- | --- |
-| `src/rooftops/finetune.py` | HOTOSM checkpoint loading and fine-tuning entry point |
-| `src/rooftops/data.py` | Building-only COCO/footprint data loading and loss |
+| `src/rooftops/finetune.py` | CLI argument parsing and training orchestration |
+| `src/rooftops/model.py` | DINOv3/UPerNet model and checkpoint loading |
+| `src/rooftops/data.py` | Building-only COCO/footprint loading and augmentation |
+| `src/rooftops/trainer.py` | Training and validation loop |
+| `src/rooftops/metrics.py` | Metrics, CSV/JSON persistence, and plots |
 | `pyproject.toml` | Package metadata and console entry point |
 | `requirements.txt` | Python dependencies |
 
