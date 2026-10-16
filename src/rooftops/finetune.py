@@ -77,8 +77,11 @@ def load_pretrained(path, device):
     result = model.load_state_dict(checkpoint["state_dict"], strict=True)
     if result.missing_keys or result.unexpected_keys:
         raise RuntimeError(f"checkpoint mismatch: {result}")
-    for parameter in model.net.backbone.parameters():
+    for parameter in model.parameters():
         parameter.requires_grad = False
+    for module in (model.net.pyramid, model.net.decoder, model.net.head):
+        for parameter in module.parameters():
+            parameter.requires_grad = True
     model.net.backbone.eval()
     model.to(device)
     return model
@@ -110,8 +113,11 @@ def main():
 
     model = load_pretrained(args.checkpoint, device)
     trainable = [p for p in model.parameters() if p.requires_grad]
-    if not trainable or any(name.startswith("net.backbone.") for name, p in model.named_parameters() if p.requires_grad):
-        raise RuntimeError("DINOv3 must remain frozen")
+    allowed = ("net.pyramid.", "net.decoder.", "net.head.")
+    if not trainable or any(
+        not name.startswith(allowed) for name, p in model.named_parameters() if p.requires_grad
+    ):
+        raise RuntimeError("only the pretrained building decoder path may be trainable")
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=1e-2)
     loader = DataLoader(
         CropDataset(train_tiles, args.crop, args.n_per_tile),
